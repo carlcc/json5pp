@@ -174,7 +174,48 @@ struct json5::converter<Color> {
 };
 ```
 
-## 5. STL Container Support
+## 5. Enum Serialization
+
+`JSON5_ENUM` maps enum values to and from JSON5 strings declaratively:
+
+```cpp
+enum class Color { Red, Green, Blue, Yellow };
+JSON5_ENUM(Color, Red, Green, Blue, Yellow)
+
+// Serialize: enum → string
+json5::to_value(Color::Red);     // "Red"
+json5::to_value(Color::Blue);    // "Blue"
+
+// Deserialize: string → enum
+json5::from_value<Color>(json5::value("Green"));  // Color::Green
+
+// Works in arrays and structs
+std::vector<Color> palette = {Color::Red, Color::Green};
+json5::to_value(palette);  // ["Red", "Green"]
+
+struct Pixel {
+    double x, y;
+    Color color;
+    JSON5_DEFINE(x, y, color)
+};
+Pixel px{10.0, 20.0, Color::Blue};
+json5::to_value(px);  // {x: 10, y: 20, color: "Blue"}
+```
+
+Unknown strings throw `json5::type_error`:
+
+```cpp
+try {
+    json5::from_value<Color>(json5::value("Purple"));
+} catch (const json5::type_error& e) {
+    // "json5 type error: unknown Color string: \"Purple\""
+}
+```
+
+**Performance:** Serialization uses a `switch` statement (O(1) via compiler
+jump table). Deserialization uses a sorted array with binary search (O(log n)).
+
+## 6. STL Container Support
 
 All common STL containers work out of the box:
 
@@ -197,7 +238,7 @@ json5::to_value(maybe);  // 42
 json5::to_value(std::optional<int>{});  // null
 ```
 
-## 6. Extending the Parser
+## 7. Extending the Parser
 
 Register custom keywords that the parser recognizes:
 
@@ -224,7 +265,7 @@ auto result = json5::parse_with_transform(input, [](json5::value& v) {
 });
 ```
 
-## 7. Strict JSON Mode
+## 8. Strict JSON Mode
 
 Disable all JSON5 extensions to parse standard JSON only:
 

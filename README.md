@@ -9,8 +9,9 @@ json5pp provides a DOM-style `json5::value` type (similar to [nlohmann/json](htt
 - **Full JSON5 support** — comments, trailing commas, unquoted keys, single-quote strings, hex numbers, `Infinity`/`NaN`, multiline strings, Unicode escapes
 - **DOM value type** — intuitive `json5::value` with subscript access, iteration, and mutation
 - **Three output styles** — compact, pretty-printed, and JSON5-idiomatic
-- **Declarative serialization** — `JSON5_DEFINE(...)` (intrusive) and `JSON5_FIELDS(Type, ...)` (non-intrusive) macros
+- **Declarative serialization** — `JSON5_DEFINE(...)` (intrusive), `JSON5_FIELDS(Type, ...)` (non-intrusive), and `JSON5_ENUM(EnumType, ...)` macros — **no field-count limit**
 - **STL coverage** — `vector`, `deque`, `list`, `array`, `set`, `unordered_set`, `map`, `unordered_map`, `optional`, `variant`, `tuple`, `pair`
+- **Enum ↔ string** — `JSON5_ENUM` maps enum values to/from strings with O(1) serialization (switch) and O(log n) deserialization (binary search)
 - **Extensible** — `converter<T>` specialization, ADL free functions, custom keyword/syntax hooks
 - **Performance** — hand-written lexer, `std::from_chars` / `std::to_chars`, zero-copy string views
 
@@ -92,10 +93,17 @@ struct Person {
 struct Point { double x, y; };
 JSON5_FIELDS(Point, x, y)
 
+// Enum ↔ string
+enum class Color { Red, Green, Blue };
+JSON5_ENUM(Color, Red, Green, Blue)
+
 // Round-trip
 Person alice{"Alice", 30};
 json5::value j = json5::to_value(alice);
 Person copy  = json5::from_value<Person>(j);
+
+json5::to_value(Color::Red);                          // "Red"
+json5::from_value<Color>(json5::value("Blue"));       // Color::Blue
 ```
 
 ### STL containers
@@ -131,7 +139,7 @@ json5pp/
 │   ├── parser.hpp       ← parse(), try_parse()
 │   ├── writer.hpp       ← stringify(), write_options
 │   ├── converter.hpp    ← converter<T>, to_value(), from_value()
-│   ├── macros.hpp       ← JSON5_DEFINE, JSON5_FIELDS
+│   ├── macros.hpp       ← JSON5_DEFINE, JSON5_FIELDS, JSON5_ENUM
 │   └── extension.hpp    ← make_keyword_extension(), parse_with_transform()
 ├── src/
 │   └── json5.cpp        ← core compiled unit (lexer + parser + writer)

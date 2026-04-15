@@ -87,6 +87,43 @@ struct Color {
 JSON5_FIELDS(Color, r, g, b)
 
 // ═══════════════════════════════════════════════════════════════════
+//  Test enums — JSON5_ENUM
+// ═══════════════════════════════════════════════════════════════════
+
+enum class Direction { North, South, East, West };
+JSON5_ENUM(Direction, North, South, East, West)
+
+enum class LogLevel { Trace, Debug, Info, Warn, Error, Fatal };
+JSON5_ENUM(LogLevel, Trace, Debug, Info, Warn, Error, Fatal)
+
+// A single-value enum to test edge case
+enum class Singleton { Only };
+JSON5_ENUM(Singleton, Only)
+
+// ═══════════════════════════════════════════════════════════════════
+//  Test struct — More than 16 fields (unlimited expansion)
+// ═══════════════════════════════════════════════════════════════════
+
+struct ManyFields {
+    int f1{}, f2{}, f3{}, f4{}, f5{}, f6{}, f7{}, f8{};
+    int f9{}, f10{}, f11{}, f12{}, f13{}, f14{}, f15{}, f16{};
+    int f17{}, f18{}, f19{}, f20{};
+
+    JSON5_DEFINE(f1, f2, f3, f4, f5, f6, f7, f8,
+                 f9, f10, f11, f12, f13, f14, f15, f16,
+                 f17, f18, f19, f20)
+};
+
+struct ManyFieldsExt {
+    int f1{}, f2{}, f3{}, f4{}, f5{}, f6{}, f7{}, f8{};
+    int f9{}, f10{}, f11{}, f12{}, f13{}, f14{}, f15{}, f16{};
+    int f17{}, f18{}, f19{}, f20{};
+};
+JSON5_FIELDS(ManyFieldsExt, f1, f2, f3, f4, f5, f6, f7, f8,
+             f9, f10, f11, f12, f13, f14, f15, f16,
+             f17, f18, f19, f20)
+
+// ═══════════════════════════════════════════════════════════════════
 //  Tests — Intrusive
 // ═══════════════════════════════════════════════════════════════════
 
@@ -242,6 +279,150 @@ static void test_missing_field_uses_default() {
     ASSERT_TRUE(!p.email.has_value());
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  Tests — Enum
+// ═══════════════════════════════════════════════════════════════════
+
+static void test_enum_roundtrip() {
+    // to_json5 → string
+    auto j_north = json5::to_value(Direction::North);
+    ASSERT_EQ(j_north.as_string(), "North");
+
+    auto j_west = json5::to_value(Direction::West);
+    ASSERT_EQ(j_west.as_string(), "West");
+
+    // from_json5 → enum
+    auto d1 = json5::from_value<Direction>(j_north);
+    ASSERT_TRUE(d1 == Direction::North);
+
+    auto d2 = json5::from_value<Direction>(j_west);
+    ASSERT_TRUE(d2 == Direction::West);
+}
+
+static void test_enum_all_values() {
+    // Verify all Direction values roundtrip
+    Direction dirs[] = {Direction::North, Direction::South, Direction::East, Direction::West};
+    const char* names[] = {"North", "South", "East", "West"};
+    for (int i = 0; i < 4; ++i) {
+        auto j = json5::to_value(dirs[i]);
+        ASSERT_EQ(j.as_string(), names[i]);
+        auto d = json5::from_value<Direction>(j);
+        ASSERT_TRUE(d == dirs[i]);
+    }
+}
+
+static void test_enum_six_values() {
+    // LogLevel has 6 values
+    LogLevel levels[] = {LogLevel::Trace, LogLevel::Debug, LogLevel::Info,
+                         LogLevel::Warn, LogLevel::Error, LogLevel::Fatal};
+    const char* names[] = {"Trace", "Debug", "Info", "Warn", "Error", "Fatal"};
+    for (int i = 0; i < 6; ++i) {
+        auto j = json5::to_value(levels[i]);
+        ASSERT_EQ(j.as_string(), names[i]);
+        auto l = json5::from_value<LogLevel>(j);
+        ASSERT_TRUE(l == levels[i]);
+    }
+}
+
+static void test_enum_unknown_string_throws() {
+    // from_json5 with unknown string should throw type_error
+    bool threw = false;
+    try {
+        (void)json5::from_value<Direction>(json5::value("NorthEast"));
+    } catch (const json5::type_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+}
+
+static void test_enum_singleton() {
+    auto j = json5::to_value(Singleton::Only);
+    ASSERT_EQ(j.as_string(), "Only");
+    auto s = json5::from_value<Singleton>(j);
+    ASSERT_TRUE(s == Singleton::Only);
+}
+
+static void test_enum_as_struct_member() {
+    // A struct containing an enum field
+    struct WithEnum {
+        std::string label;
+        Direction dir;
+        JSON5_DEFINE(label, dir)
+    };
+
+    WithEnum we{"forward", Direction::East};
+    auto j = json5::to_value(we);
+    ASSERT_EQ(j["label"].as_string(), "forward");
+    ASSERT_EQ(j["dir"].as_string(), "East");
+
+    WithEnum we2 = json5::from_value<WithEnum>(j);
+    ASSERT_EQ(we2.label, "forward");
+    ASSERT_TRUE(we2.dir == Direction::East);
+}
+
+static void test_enum_vector() {
+    std::vector<Direction> dirs = {Direction::North, Direction::South, Direction::East};
+    auto j = json5::to_value(dirs);
+    ASSERT_EQ(j.size(), 3u);
+    ASSERT_EQ(j[0].as_string(), "North");
+    ASSERT_EQ(j[1].as_string(), "South");
+    ASSERT_EQ(j[2].as_string(), "East");
+
+    auto dirs2 = json5::from_value<std::vector<Direction>>(j);
+    ASSERT_EQ(dirs2.size(), 3u);
+    ASSERT_TRUE(dirs2[0] == Direction::North);
+    ASSERT_TRUE(dirs2[1] == Direction::South);
+    ASSERT_TRUE(dirs2[2] == Direction::East);
+}
+
+static void test_enum_parse_json5() {
+    auto j = json5::parse(R"({ dir: 'West' })");
+    auto d = json5::from_value<Direction>(j["dir"]);
+    ASSERT_TRUE(d == Direction::West);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Tests — More than 16 fields
+// ═══════════════════════════════════════════════════════════════════
+
+static void test_many_fields_intrusive() {
+    ManyFields m{};
+    m.f1 = 1; m.f2 = 2; m.f3 = 3; m.f4 = 4;
+    m.f5 = 5; m.f6 = 6; m.f7 = 7; m.f8 = 8;
+    m.f9 = 9; m.f10 = 10; m.f11 = 11; m.f12 = 12;
+    m.f13 = 13; m.f14 = 14; m.f15 = 15; m.f16 = 16;
+    m.f17 = 17; m.f18 = 18; m.f19 = 19; m.f20 = 20;
+
+    auto j = json5::to_value(m);
+    ASSERT_EQ(j["f1"].as_integer(), 1);
+    ASSERT_EQ(j["f10"].as_integer(), 10);
+    ASSERT_EQ(j["f17"].as_integer(), 17);
+    ASSERT_EQ(j["f20"].as_integer(), 20);
+
+    ManyFields m2 = json5::from_value<ManyFields>(j);
+    ASSERT_EQ(m2.f1, 1);
+    ASSERT_EQ(m2.f10, 10);
+    ASSERT_EQ(m2.f17, 17);
+    ASSERT_EQ(m2.f20, 20);
+}
+
+static void test_many_fields_nonintrusive() {
+    ManyFieldsExt m{};
+    m.f1 = 100; m.f16 = 160; m.f17 = 170; m.f20 = 200;
+
+    auto j = json5::to_value(m);
+    ASSERT_EQ(j["f1"].as_integer(), 100);
+    ASSERT_EQ(j["f16"].as_integer(), 160);
+    ASSERT_EQ(j["f17"].as_integer(), 170);
+    ASSERT_EQ(j["f20"].as_integer(), 200);
+
+    ManyFieldsExt m2 = json5::from_value<ManyFieldsExt>(j);
+    ASSERT_EQ(m2.f1, 100);
+    ASSERT_EQ(m2.f16, 160);
+    ASSERT_EQ(m2.f17, 170);
+    ASSERT_EQ(m2.f20, 200);
+}
+
 // ── Entry point ───────────────────────────────────────────────────
 
 int main() {
@@ -255,6 +436,20 @@ int main() {
     RUN_TEST(nonintrusive_basic);
     RUN_TEST(nonintrusive_nested);
     RUN_TEST(nonintrusive_three_fields);
+
+    // Enum
+    RUN_TEST(enum_roundtrip);
+    RUN_TEST(enum_all_values);
+    RUN_TEST(enum_six_values);
+    RUN_TEST(enum_unknown_string_throws);
+    RUN_TEST(enum_singleton);
+    RUN_TEST(enum_as_struct_member);
+    RUN_TEST(enum_vector);
+    RUN_TEST(enum_parse_json5);
+
+    // More than 16 fields
+    RUN_TEST(many_fields_intrusive);
+    RUN_TEST(many_fields_nonintrusive);
 
     // Integration
     RUN_TEST(parse_to_struct);

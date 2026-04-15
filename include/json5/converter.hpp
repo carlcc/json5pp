@@ -80,6 +80,7 @@
 /// | `std::pair<A, B>` | 2-element array |
 /// | `std::tuple<Ts...>` | N-element array |
 /// | `std::variant<Ts...>` | `{"index": i, "value": ...}` |
+/// | Enum types (via `JSON5_ENUM`) | string (enumerator name) |
 
 #pragma once
 

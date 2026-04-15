@@ -40,7 +40,7 @@ a single translation unit (`src/json5.cpp`).
 | **Parser** | `parser.hpp` + `json5.cpp` | Recursive-descent parser; builds DOM tree |
 | **Writer** | `writer.hpp` + `json5.cpp` | Serializer with pluggable formatting options |
 | **Type converter** | `converter.hpp` | `converter<T>` template + all built-in specializations |
-| **Macros** | `macros.hpp` | `JSON5_DEFINE` / `JSON5_FIELDS` code generation |
+| **Macros** | `macros.hpp` | `JSON5_DEFINE` / `JSON5_FIELDS` / `JSON5_ENUM` code generation |
 | **Extensions** | `extension.hpp` | `make_keyword_extension`, `parse_with_transform` |
 
 ## Key Design Decisions
@@ -108,17 +108,44 @@ The `detail::adl_invoker` struct is used to call ADL functions from within
 the converter, avoiding issues with unqualified lookup inside the `json5`
 namespace.
 
-### 6. Macro-based Code Generation
+### 6. Macro + Variadic Template Code Generation
 
-`JSON5_DEFINE` and `JSON5_FIELDS` use variadic macro expansion
-(up to 16 fields) to generate serialization code. This approach was
-chosen over reflection (not available in C++20) and external code
-generators (adds build complexity).
+`JSON5_DEFINE`, `JSON5_FIELDS`, and `JSON5_ENUM` use a **macro + variadic
+template** hybrid approach:
 
-The macros expand to straightforward field-by-field serialization, making
-the generated code easy to understand and debug.
+- **Macros** handle only what templates cannot: the `#` stringification
+  operator (converting field/enumerator names to string literals) and the
+  `&Type::field` member-pointer syntax.
+- **Variadic templates** (`detail::to_fields`, `detail::from_fields`,
+  `detail::make_enum_table`) handle the actual recursive expansion over
+  all fields/values. This provides full type safety, clear compiler error
+  messages, and no limit on the number of arguments (bounded only by
+  compiler template instantiation depth, typically 900+).
 
-### 7. Extensible Parser Hooks
+The `__VA_OPT__`-based `FOR_EACH` macro is used solely to generate the
+comma-separated `("name", &Type::name, "age", &Type::age, ...)` argument
+list that feeds into the variadic templates.
+
+**Previous approach:** The original implementation used manually numbered
+`FOREACH_1` through `FOREACH_16` macros, limiting fields to 16. The new
+design eliminates this constraint entirely.
+
+### 7. Enum Serialization Strategy
+
+`JSON5_ENUM` generates a `converter<EnumType>` specialization with two
+high-performance mapping strategies:
+
+- **`to_json5` (enum → string):** Uses a `switch` statement over all
+  registered enumerators. Modern compilers optimize this to a jump table,
+  yielding O(1) lookup.
+- **`from_json5` (string → enum):** Uses a `constexpr` sorted
+  `std::array<enum_entry, N>` with binary search (`O(log n)`). The array
+  is sorted at compile time using a constexpr insertion sort, so runtime
+  deserialization pays zero sorting cost.
+
+Unknown enum strings during deserialization throw `type_error`.
+
+### 8. Extensible Parser Hooks
 
 The `parse_options::custom_value_parser` callback enables users to extend
 the JSON5 grammar without modifying the library. When the parser encounters

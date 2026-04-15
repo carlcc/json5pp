@@ -1,10 +1,11 @@
 //
-// Example: Custom type serialization with JSON5_DEFINE / JSON5_FIELDS
+// Example: Custom type serialization with JSON5_DEFINE / JSON5_FIELDS / JSON5_ENUM
 //
 
 #include <json5/json5.hpp>
 #include <iostream>
 #include <optional>
+#include <vector>
 
 // ── Intrusive: JSON5_DEFINE inside the struct ────────────────────
 struct Person {
@@ -22,6 +23,10 @@ struct Point {
 };
 JSON5_FIELDS(Point, x, y)
 
+// ── Enum serialization: JSON5_ENUM ──────────────────────────────
+enum class Color { Red, Green, Blue, Yellow, Cyan, Magenta };
+JSON5_ENUM(Color, Red, Green, Blue, Yellow, Cyan, Magenta)
+
 // ── Struct with json5::value member (schema-free field) ─────────
 struct Config {
     std::string name;
@@ -29,6 +34,14 @@ struct Config {
     json5::value metadata;  // arbitrary JSON5 data, no fixed schema
 
     JSON5_DEFINE(name, version, metadata)
+};
+
+// ── Struct containing an enum field ─────────────────────────────
+struct Pixel {
+    Point position;
+    Color color;
+
+    JSON5_DEFINE(position, color)
 };
 
 int main() {
@@ -92,6 +105,31 @@ int main() {
     // 3) Re-serialize to verify roundtrip
     std::string cfg2_str = json5::stringify(json5::to_value(cfg2), json5::write_options::pretty_json5());
     std::cout << "\nRe-serialized:\n" << cfg2_str << "\n";
+
+    // Enum conversion
+    std::cout << "\n--- Enum (JSON5_ENUM) ---\n";
+
+    Color c = Color::Green;
+    json5::value c_json = json5::to_value(c);
+    std::cout << "Color::Green → " << json5::stringify(c_json) << "\n";
+
+    Color c2 = json5::from_value<Color>(json5::parse("'Blue'"));
+    std::cout << "'Blue' → Color::" << json5::stringify(json5::to_value(c2)) << "\n";
+
+    // Enum in array
+    std::vector<Color> palette = {Color::Red, Color::Green, Color::Blue};
+    json5::value palette_json = json5::to_value(palette);
+    std::cout << "Palette: " << json5::stringify(palette_json) << "\n";
+
+    // Struct with enum member
+    std::cout << "\n--- Struct with enum field ---\n";
+    Pixel px{{10.5, 20.3}, Color::Magenta};
+    json5::value px_json = json5::to_value(px);
+    std::cout << json5::stringify(px_json, json5::write_options::pretty_json5()) << "\n";
+
+    Pixel px2 = json5::from_value<Pixel>(px_json);
+    std::cout << "Roundtrip: (" << px2.position.x << ", " << px2.position.y
+              << ") color=" << json5::stringify(json5::to_value(px2.color)) << "\n";
 
     return 0;
 }
