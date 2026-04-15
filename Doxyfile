@@ -1,0 +1,52 @@
+# Doxyfile for json5pp
+# Run: doxygen Doxyfile
+# Output: docs/api/
+
+PROJECT_NAME           = "json5pp"
+PROJECT_BRIEF          = "A high-performance C++20 JSON5 parsing & serialization library"
+PROJECT_NUMBER         = "1.0"
+
+# ── Input ──────────────────────────────────────────────────────────
+INPUT                  = include/json5
+FILE_PATTERNS          = *.hpp
+RECURSIVE              = YES
+STRIP_FROM_PATH        = include
+
+# ── Output ─────────────────────────────────────────────────────────
+OUTPUT_DIRECTORY       = docs/api
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HTML_OUTPUT            = html
+
+# ── Behavior ───────────────────────────────────────────────────────
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+JAVADOC_AUTOBRIEF      = YES
+MARKDOWN_SUPPORT       = YES
+
+# Show @code blocks with syntax highlighting
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+
+# ── Preprocessing ──────────────────────────────────────────────────
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+PREDEFINED             = JSON5_DEFINE(...)= \
+                         JSON5_FIELDS(Type,...)=
+
+# ── Sorting ────────────────────────────────────────────────────────
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO
+
+# ── Warnings ───────────────────────────────────────────────────────
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+
+# ── Diagram ────────────────────────────────────────────────────────
+HAVE_DOT               = NO
+CLASS_DIAGRAMS         = YES
